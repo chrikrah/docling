@@ -865,6 +865,41 @@ def test_sparse_table_cells_inside_bbox_are_not_duplicated(tmp_path: Path) -> No
     assert texts.count("bar") == 1
 
 
+@pytest.mark.parametrize("merge", ["C3:D3", "C3:C4"])
+def test_merged_range_reaching_outside_the_table_is_clipped(
+    tmp_path: Path, merge: str
+) -> None:
+    """A span must stay inside the table that declares it.
+
+    The anchor of a merged range can sit in the table's bounding box while the
+    rest of the range falls outside it. The span was taken unclipped, so the
+    cell claimed rows or columns the table does not have and the HTML export
+    wrote a colspan wider than the table, or a rowspan reaching past its last
+    row.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet["A1"], sheet["B1"], sheet["C1"] = "a", "b", "c"
+    sheet["A2"], sheet["A3"] = "d", "e"
+    sheet["C3"] = "note"
+    sheet.merge_cells(merge)
+
+    file_path = tmp_path / "overflowing_merge.xlsx"
+    workbook.save(file_path)
+
+    converter = DocumentConverter(allowed_formats=[InputFormat.XLSX])
+    doc = converter.convert(file_path).document
+
+    assert len(doc.tables) == 1
+    table = doc.tables[0]
+    assert (table.data.num_rows, table.data.num_cols) == (3, 3)
+    for cell in table.data.table_cells:
+        assert cell.end_row_offset_idx <= table.data.num_rows
+        assert cell.end_col_offset_idx <= table.data.num_cols
+    note = next(cell for cell in table.data.table_cells if cell.text == "note")
+    assert (note.row_span, note.col_span) == (1, 1)
+
+
 def test_gap_tolerance_comparison() -> None:
     """Test the effect of gap_tolerance on table detection.
 

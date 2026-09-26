@@ -1088,8 +1088,14 @@ class MsExcelDocumentBackend(DeclarativeDocumentBackend, PaginatedDocumentBacken
 
                 cell_text = str(cell.value) if cell.value is not None else ""
 
-                # Compute Spans
+                # Compute Spans. The anchor of a merged range can sit inside the
+                # bounding box while the rest of the range falls outside it, so
+                # clip: an unclipped span claims rows or columns this table does
+                # not have, and the HTML export then writes a colspan wider than
+                # the table or a rowspan reaching past its last row.
                 row_span, col_span = merged_cell_index.span_at(ri, rj)
+                row_span = min(row_span, max_r + 1 - ri)
+                col_span = min(col_span, max_c + 1 - rj)
 
                 data.append(
                     ExcelCell(
