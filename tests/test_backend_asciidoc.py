@@ -46,6 +46,27 @@ def test_list_dedent_to_base_does_not_crash() -> None:
     assert [item.text for item in doc.texts] == ["a", "b"]
 
 
+def test_word_followed_by_a_dot_stays_prose() -> None:
+    # The ordered-list pattern accepted a whole word before the dot, so a
+    # sentence opening "Fig. 1 shows ..." became a list item and the word was
+    # dropped along with the marker. AsciiDoc's explicit numbering is a single
+    # letter, so only that -- and a run of digits -- starts a list.
+    src = b"Fig. 1 shows the layout.\n\na. explicit letter item\nb. second one\n"
+    in_doc = InputDocument(
+        path_or_stream=BytesIO(src),
+        format=InputFormat.ASCIIDOC,
+        backend=AsciiDocBackend,
+        filename="figdot.asciidoc",
+    )
+    doc = in_doc._backend.convert()
+
+    assert [(item.label, item.text) for item in doc.texts] == [
+        (DocItemLabel.PARAGRAPH, "Fig. 1 shows the layout."),
+        (DocItemLabel.LIST_ITEM, "explicit letter item"),
+        (DocItemLabel.LIST_ITEM, "second one"),
+    ]
+
+
 def test_rowspan_only_cell_specifier_keeps_the_row() -> None:
     # AsciiDoc writes a span as [colspan][.rowspan] followed by "+" or "*", and
     # either number may be omitted, so ".2+" is a rowspan on its own. The cell

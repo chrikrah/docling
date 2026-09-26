@@ -40,7 +40,10 @@ _log = logging.getLogger(__name__)
 # "+" or "*", and either number may be omitted, so ".2+" is a rowspan on its
 # own. Requiring at least one of the two keeps a bare "+" from matching.
 _CELL_SPEC: Final = r"(?:(?:\d+(?:\.\d+)?|\.\d+)[*+])*[<^>]?(?:\.[<^>])?[adehlms]?"
-_LIST_ITEM_PATTERN: Final = r"^(\s*)(\*|-|\.+|\d+\.|\w+\.)\s+(.*)"
+# Explicit numbering styles are a single letter or a run of digits, the same as
+# AsciiDoc's own ordered-list rule. Allowing a whole word before the dot turned
+# any sentence opening "Fig. 1 shows ..." into a list item and dropped "Fig.".
+_LIST_ITEM_PATTERN: Final = r"^(\s*)(\*|-|\.+|\d+\.|[A-Za-z]\.)\s+(.*)"
 
 
 @dataclass(frozen=True)
