@@ -432,6 +432,27 @@ def test_ordered_lists():
             "1. 1st item\n2. 2nd item",
         )
     )
+    # A superscript or a Han numeral passes str.isnumeric() but int() refuses it,
+    # which used to raise ValueError and abort the whole conversion.
+    test_set.append(
+        (
+            '<html><body><ol start="²"><li>1st item</li><li>2nd item</li></ol></body></html>'.encode(),
+            "1. 1st item\n2. 2nd item",
+        )
+    )
+    test_set.append(
+        (
+            '<html><body><ol start="三"><li>1st item</li><li>2nd item</li></ol></body></html>'.encode(),
+            "1. 1st item\n2. 2nd item",
+        )
+    )
+    # Non-ASCII decimal digits are still read, since int() accepts them.
+    test_set.append(
+        (
+            '<html><body><ol start="٣"><li>1st item</li><li>2nd item</li></ol></body></html>'.encode(),
+            "3. 1st item\n4. 2nd item",
+        )
+    )
 
     for idx, pair in enumerate(test_set):
         in_doc = InputDocument(

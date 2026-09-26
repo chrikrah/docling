@@ -2770,7 +2770,10 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
             name = "description list"
         elif is_ordered:
             start_attr = tag.get("start")
-            if isinstance(start_attr, str) and start_attr.isnumeric():
+            # `isdecimal()` and not `isnumeric()`: the latter also accepts
+            # superscripts, fractions and Han numerals ("²", "½", "三"), which
+            # `int()` then refuses, aborting the whole conversion.
+            if isinstance(start_attr, str) and start_attr.isdecimal():
                 start = int(start_attr)
             name = "ordered list" + (f" start {start}" if start is not None else "")
         else:
