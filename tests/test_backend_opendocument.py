@@ -494,6 +494,38 @@ def test_odt_ordered_nested_list(tmp_path: Path):
     assert nested_group.parent == list_items[0].get_ref()
 
 
+def test_odt_ordered_list_keeps_num_prefix(tmp_path: Path):
+    # A list level puts text on both sides of the number: "(1)" is
+    # style:num-prefix="(" plus style:num-suffix=")". Only the suffix was read,
+    # so the prefix was dropped from the marker.
+    path = tmp_path / "prefixed.odt"
+    doc = OdfDocument("text")
+    body = doc.body
+    body.clear()
+
+    style = Style("list", name="Parenthesised")
+    style.set_level_style(1, num_format="1", prefix="(", suffix=")")
+    doc.insert_style(style)
+
+    lst = OdfList(style="Parenthesised")
+    lst.append(ListItem("One"))
+    lst.append(ListItem("Two"))
+    body.append(lst)
+    doc.save(str(path))
+
+    res = DocumentConverter(allowed_formats=[InputFormat.ODT]).convert(path)
+    list_items = [
+        item
+        for item, _level in res.document.iterate_items()
+        if isinstance(item, TextItem) and item.label == "list_item"
+    ]
+
+    assert [(item.text, item.marker) for item in list_items] == [
+        ("One", "(1)"),
+        ("Two", "(2)"),
+    ]
+
+
 def test_odt_text_document_nested_lists():
     path = Path("tests/data/odf/sources/text_document_01.odt")
 

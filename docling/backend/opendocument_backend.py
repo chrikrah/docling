@@ -766,10 +766,14 @@ def _odf_list_marker(
     level: int,
 ) -> str:
     level_style = _odf_list_level_style(odf_obj, odf_list, level)
+    prefix = ""
     suffix = "."
     if level_style is not None:
+        # A list level carries text on both sides of the number: "(1)" is
+        # style:num-prefix="(" plus style:num-suffix=")".
+        prefix = level_style.attributes.get("style:num-prefix") or prefix
         suffix = level_style.attributes.get("style:num-suffix") or suffix
-    return f"{counter}{suffix}"
+    return f"{prefix}{counter}{suffix}"
 
 
 def _odf_table_has_content(table: OdfTable) -> bool:
