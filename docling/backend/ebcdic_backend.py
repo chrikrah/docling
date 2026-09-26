@@ -191,7 +191,11 @@ class _RecordParser:
         values: list[str] = []
         offset = 0
         for field in record.fields:
-            chunk = body[offset : offset + field.size]
+            # A variable-length record carries its own length, which can be
+            # shorter than the schema needs. A bare slice would hand the
+            # decoders a short chunk, and a truncated COMP-3 value silently
+            # loses digits and reads the wrong nibble as its sign.
+            chunk = self._take(body, offset, field.size, len(body), field.name)
             offset += field.size
             if field.type is not EbcdicFieldType.SKIP:
                 value = self._decoder.decode(chunk, field)

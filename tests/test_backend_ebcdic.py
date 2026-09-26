@@ -261,6 +261,47 @@ def test_truncated_record_is_reported(employee_layout):
         _backend(truncated, EbcdicBackendOptions(layout=employee_layout)).convert()
 
 
+def test_record_shorter_than_its_schema_is_reported():
+    """A record whose own length field is short must not decode a partial field.
+
+    The body size of a variable-length record comes from the file, so it can be
+    shorter than the schema needs. Slicing past its end used to hand the COMP-3
+    decoder four of five bytes, and -1234.56 came out as 12.34: two orders of
+    magnitude lost and the sign read off the wrong nibble, reported as success.
+    """
+    layout = EbcdicLayout(
+        record_length_field=EbcdicField(
+            name="length", size=2, type=EbcdicFieldType.UNSIGNED_INTEGER
+        ),
+        records=[
+            EbcdicRecordLayout(
+                name="line",
+                fields=[
+                    EbcdicField(name="sku", size=4),
+                    EbcdicField(
+                        name="amount",
+                        size=5,
+                        type=EbcdicFieldType.PACKED_DECIMAL,
+                        scale=2,
+                    ),
+                ],
+            )
+        ],
+    )
+    body = _text("A100", 4) + _packed(-123456, 5)
+
+    intact = (2 + len(body)).to_bytes(2, "big") + body
+    document = _backend(intact, EbcdicBackendOptions(layout=layout)).convert()
+    assert [cell.text for cell in document.tables[0].data.grid[1]] == [
+        "A100",
+        "-1234.56",
+    ]
+
+    one_byte_short = (1 + len(body)).to_bytes(2, "big") + body[:-1]
+    with pytest.raises(EbcdicDecodeError, match="Input ends inside 'amount'"):
+        _backend(one_byte_short, EbcdicBackendOptions(layout=layout)).convert()
+
+
 def test_unknown_record_type_is_reported():
     layout = EbcdicLayout(
         record_type_field=EbcdicField(name="kind", size=1),
