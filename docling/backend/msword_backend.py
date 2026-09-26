@@ -195,6 +195,9 @@ _STRICT_OOXML_NS_RE: Final = re.compile(
 _MAX_HEADING_LEVEL: Final[int] = 9
 """OOXML headings are 1-9. Values outside that range are clamped."""
 
+_OOXML_OFF_VALUES: Final[frozenset[str]] = frozenset({"0", "false", "off"})
+"""The ``ST_OnOff`` values that clear a toggle; every other value sets it."""
+
 _VISIBLE_NUMBERING_FORMATS: Final[frozenset[str]] = frozenset(
     {
         "decimal",
@@ -1887,8 +1890,8 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
             element: The paragraph element containing the checkbox.
 
         Returns:
-            True if checked (w14:checked val="1"), False if unchecked
-                (val="0" or missing).
+            True if the ``w14:checked`` element is set, False if it clears the
+                box or is absent.
         """
         w14_ns = _OOXML_NAMESPACES["w14"]
         checkboxes = element.findall(f".//{{{w14_ns}}}checkbox")
@@ -1899,8 +1902,12 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
         checked_elem = checkbox.find(f".//{{{w14_ns}}}checked")
 
         if checked_elem is not None:
+            # w14:val is an OOXML ST_OnOff: "1", "true" and "on" all set the
+            # box, an absent value sets it too, and only "0", "false" and "off"
+            # clear it. Word writes "1", but the other spellings are valid and
+            # other producers use them.
             val = checked_elem.get(f"{{{w14_ns}}}val")
-            return val == "1"
+            return val is None or val not in _OOXML_OFF_VALUES
 
         return False
 

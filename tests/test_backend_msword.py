@@ -31,7 +31,7 @@ from PIL import Image
 
 import docling.backend.msword_backend as msword_backend_module
 from docling.backend.docx.drawingml.utils import get_libreoffice_cmd
-from docling.backend.msword_backend import MsWordDocumentBackend
+from docling.backend.msword_backend import _OOXML_NAMESPACES, MsWordDocumentBackend
 from docling.datamodel.backend_options import MsWordBackendOptions
 from docling.datamodel.base_models import DocumentStream, InputFormat
 from docling.datamodel.document import (
@@ -1389,6 +1389,43 @@ def test_checkbox_labels_in_tables(documents):
     assert any(
         any(food in item.text for food in food_items) for item in checkbox_items
     ), "No checkboxes found in table cells"
+
+
+@pytest.mark.parametrize(
+    "val, expected",
+    [
+        ("1", DocItemLabel.CHECKBOX_SELECTED),
+        ("true", DocItemLabel.CHECKBOX_SELECTED),
+        ("on", DocItemLabel.CHECKBOX_SELECTED),
+        (None, DocItemLabel.CHECKBOX_SELECTED),
+        ("0", DocItemLabel.CHECKBOX_UNSELECTED),
+        ("false", DocItemLabel.CHECKBOX_UNSELECTED),
+        ("off", DocItemLabel.CHECKBOX_UNSELECTED),
+    ],
+)
+def test_checkbox_reads_every_on_off_spelling(tmp_path, val, expected):
+    """``w14:val`` is an ST_OnOff, so "true", "on" and an absent value all tick.
+
+    Only "1" used to count as ticked, so a checkbox written with any other
+    valid spelling was reported as unticked.
+    """
+    w14 = _OOXML_NAMESPACES["w14"]
+    document = Document()
+    paragraph = document.add_paragraph()
+    sdt = etree.SubElement(paragraph._p, qn("w:sdt"))
+    sdt_pr = etree.SubElement(sdt, qn("w:sdtPr"))
+    checkbox = etree.SubElement(sdt_pr, f"{{{w14}}}checkbox")
+    checked = etree.SubElement(checkbox, f"{{{w14}}}checked")
+    if val is not None:
+        checked.set(f"{{{w14}}}val", val)
+    sdt_content = etree.SubElement(sdt, qn("w:sdtContent"))
+    etree.SubElement(etree.SubElement(sdt_content, qn("w:r")), qn("w:t")).text = "☒"
+    paragraph.add_run(" Agreed")
+
+    doc = _convert_built(document, tmp_path)
+
+    item = next(item for item in doc.texts if item.text == "Agreed")
+    assert item.label == expected
 
 
 def test_text_after_drawingml_images(documents):
